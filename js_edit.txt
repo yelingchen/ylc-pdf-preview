@@ -1,0 +1,211 @@
+
+THIS_FRAME.edit.data.js_openHint = false;
+THIS_FRAME.edit.data.js_editor;
+THIS_FRAME.edit.data.js_edit_is_initialize = false;
+THIS_FRAME.edit.methods.initialize_js_edit = function () {
+
+    if (THIS_FRAME.edit.data.js_edit_is_initialize) {
+        return;
+    }
+    THIS_FRAME.edit.data.js_edit_is_initialize = true;
+    //按下事件\siguo\js\CodeMirror\addon\dialog
+    //改提示文字\siguo\js\CodeMirror\addon\search
+
+    THIS_FRAME.edit.data.js_editor = CodeMirror.fromTextArea(document.getElementById("edit_js_code"), {
+        lineNumbers: true,
+        matchBrackets: true,
+        readOnly: (!THIS_FRAME.utils.methods.getDevModeStatus()),
+        continueComments: "Enter",
+        mode: "text/javascript", //编译器语言
+        theme: "idea", //仿idea界面
+        lineWrapping: true,	//代码折叠
+        foldGutter: true,
+        //theme:"eclipse",//仿eclipse界面
+        scrollbarStyle: null, //隐藏滚动条
+        showCursorWhenSelecting: true,
+        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter', 'CodeMirror-lint-markers'],
+        extraKeys: {
+            "Ctrl-Q": "toggleComment", "F11": "toggleFullscreenEditing", "ESC": "toggleFullscreenEditing",
+            // "Alt-F": "findPersistent",
+            "Ctrl-S": function () {
+                if (!THIS_FRAME.utils.methods.getDevModeStatus()) {
+                    THIS_FRAME.page.methods.openAlert("只读模式无法修改JS脚本", "无权操作");
+                    return;
+                } else {
+                    //这里执行保存动作
+                    console.log("保存js");
+                    THIS_FRAME.edit.methods.save_js_code();
+                }
+            }
+        },
+        hintOptions: {
+            // 当匹配只有一项的时候是否自动补全
+            completeSingle: false
+            //自定义提示选项
+            /*
+            tables: {
+              users: ["name", "score", "birthDate"],
+              countries: ["name", "population", "size"]
+            }
+            */
+        }
+    });
+    THIS_FRAME.edit.data.js_editor.on('cursorActivity', function (s) { //代码自动提示功能，记住使用cursorActivity事件不要使用change事件，这是一个坑，那样页面直接会卡死
+
+        var cur = THIS_FRAME.edit.data.js_editor.getCursor();
+        var txt = THIS_FRAME.edit.data.js_editor.getTokenAt(cur);
+        //console.log("得到输入：" , txt);
+        if (txt.string == "" || txt.string == " " || txt.string == "  " ||
+            txt.string == ";" || txt.string == "{" || txt.string == "}" ||
+            txt.string == "(" || txt.string == ")"
+        ) {
+            //console.log(txt);
+
+            return;
+        }
+        if (THIS_FRAME.edit.data.js_openHint) {
+            //console.log("联想");
+            THIS_FRAME.edit.data.js_editor.showHint();  //满足自动触发自动联想功能
+        }
+    });
+
+    THIS_FRAME.edit.data.js_editor.on("keyup", function (s, e) {
+        //console.log("按键key",e.key);
+        if (e.key == ";" || e.key == "Enter" || e.key == "ArrowLeft" || e.key == "ArrowRight" || e.key == "Backspace" || e.key == "Tab" || e.key == "Enter") {
+            //console.log("关闭显示智能提示");//e.key =="ArrowUp"||e.key =="ArrowDown"||
+            THIS_FRAME.edit.data.js_openHint = false;
+            THIS_FRAME.edit.data.js_editor.closeHint();
+        } else {
+            THIS_FRAME.edit.data.js_openHint = true;
+        }
+    });
+
+    //改变事件，触发回调方法
+    THIS_FRAME.edit.data.js_editor.on("change", function (Editor, changes) {
+        //改变切换到其他页面要有提示保存
+        THIS_FRAME.edit.methods.setJSSaveHint(true);
+    });
+
+}
+
+//获取js代码
+THIS_FRAME.edit.methods.getJsCode = function () {
+    if (!THIS_FRAME.edit.data.js_editor) return "";
+    return THIS_FRAME.edit.data.js_editor.getValue();
+}
+
+/**
+ * 预览js代码
+ * @returns {string}
+ */
+THIS_FRAME.edit.methods.pwJsCode = function () {
+    var html = '';
+    html += ' <script> ';
+    if (THIS_FRAME.edit.data.js_edit_is_initialize) {
+        html += THIS_FRAME.edit.methods.getJsCode();
+    } else {
+        html += $("#edit_js_code").val()
+    }
+    html += ' <\/script> ';
+    //return html;
+    $("#render_js_code").html(html);
+}
+
+
+/**
+ * 保存js编辑器代码
+ * @returns 
+ */
+THIS_FRAME.edit.methods.save_js_code = function () {
+    var js_code = THIS_FRAME.edit.methods.getJsCode();
+
+    if (!THIS_FRAME.edit.methods.check_js_code(js_code)) {
+        return;
+    }
+
+    //savepagejscode
+    var callBack = new Object();
+    callBack.success = function (e) {
+        if (e.errcode == 0) {
+            THIS_FRAME.edit.methods.setJSSaveHint(false)
+
+            THIS_FRAME.edit.methods.showEditHint("“js脚本”保存成功！", 3)
+
+        } else if (e.errcode == 5000 || e.errcode == 5001) {
+            THIS_FRAME.ajax.methods.openLogin();
+        } else {
+            THIS_FRAME.page.methods.openAlert(JSON.stringify(e), "保存失败")
+        }
+
+    }
+
+    THIS_FRAME.ajax.methods.runAjax({
+        url: "savepagejscode",
+        data: { "id": THIS_FRAME.utils.methods.getPageId(), "js_code": THIS_FRAME.edit.methods.getJsCode() }
+    }, callBack);
+
+}
+
+/**
+ * 校验js代码
+ * @param { string } code 编辑器代码
+ * @returns 
+ */
+THIS_FRAME.edit.methods.check_js_code = function (code) {
+    if (!code) return true;
+
+
+
+    var let_exp = /[\r\n\s]let[\r\n\s]/;
+    var has_let = let_exp.test(code);
+
+
+    var const_exp = /[\r\n\s]const[\r\n\s]/;
+    var has_const = const_exp.test(code);
+
+    if (has_let || has_const) {
+        var c_test = "";
+        if (has_let && !has_const) {
+            c_test = "“let”";
+        }
+        if (has_const && !has_let) {
+            c_test = "“const”";
+        }
+        if (has_const && has_let) {
+            c_test = "“let”和“const”";
+        }
+
+        THIS_FRAME.page.methods.openAlert("您的代码包含" + c_test + "的声明变量，旧版本浏览器可能不兼容！<br>建议使用“var”！", "保存失败");
+        return false;
+    }
+
+    return true;
+}
+
+
+THIS_FRAME.edit.data.js_save_hint = false;
+THIS_FRAME.edit.methods.setJSSaveHint = function (st) {
+    if (st) {
+        THIS_FRAME.edit.data.js_save_hint = true;
+    } else {
+        THIS_FRAME.edit.data.js_save_hint = false;
+    }
+    //关窗，离开提示
+    THIS_FRAME.edit.methods.setSaveHint();
+}
+//获取提示是否保存
+THIS_FRAME.edit.methods.getJSSaveHint = function () {
+    return THIS_FRAME.edit.data.js_save_hint;
+}
+/**
+ *  追加代码，可以用于代码库向编辑区追加常用代码
+ *  @param code	    js代码
+ *  @param is_end	插入底部（true：插入编辑区底部，false：插入光标位置）
+ **/
+THIS_FRAME.edit.methods.appendJsCodeToEdit = function (code, is_end) {
+    if (is_end) {
+        THIS_FRAME.edit.data.js_editor.focus();
+        THIS_FRAME.edit.data.js_editor.setCursor(THIS_FRAME.edit.data.js_editor.lineCount(), 0);
+    }
+    THIS_FRAME.edit.data.js_editor.replaceSelection("\n" + code)
+}
