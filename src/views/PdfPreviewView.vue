@@ -123,7 +123,6 @@ const act_renderPage = async (currentPage) => {
 
   // 获取页面视图
   const viewport = pdfPage.getViewport({ scale: g_scale.value });
-  canvas.setAttribute('style', 'position: absolute;left: 50%;top: 50%;transform: translate(-50%, -50%);');
   canvas.width = viewport.width;
   canvas.height = viewport.height;
 
@@ -226,6 +225,9 @@ const act_download = () => {
   position: relative;
   flex: 1 1 0;
   margin: 0 8px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
   border: 1px solid #ccc;
   border-radius: 8px;
   overflow: auto;
